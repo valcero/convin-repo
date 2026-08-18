@@ -6,8 +6,10 @@ import (
 	"io"
 	"log/slog"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/convin/webhook-ingest/internal/config"
 	"github.com/convin/webhook-ingest/internal/httpapi"
@@ -27,6 +29,7 @@ import (
 func IDs(t *testing.T, s *store.Store) (eventID, callID, accountID string) {
 	t.Helper()
 	base := strings.NewReplacer("/", "_", " ", "_").Replace(t.Name())
+	base += "_" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	eventID, callID, accountID = "evt_"+base, "call_"+base, "acc_"+base
 
 	clean := func() {

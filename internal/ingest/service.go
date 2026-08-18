@@ -39,6 +39,15 @@ func (s *Service) Stats(accountID string) stats.AccountStats {
 // Ingest stores a delivery and kicks off processing. Processing runs
 // asynchronously so the provider gets a fast acknowledgement.
 func (s *Service) Ingest(ctx context.Context, evt Event) error {
+	acquired, err := s.rdb.SetNX(ctx, "event:"+evt.EventID, "1", 24*time.Hour).Result()
+	if err != nil {
+		return err
+	}
+	if !acquired {
+		s.log.Info("duplicate delivery ignored (redis lock)", "event_id", evt.EventID)
+		return nil
+	}
+
 	exists, err := s.store.EventExists(ctx, evt.EventID)
 	if err != nil {
 		return err

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -74,11 +75,23 @@ func TestDuplicateDeliveryIsIgnored(t *testing.T) {
 	ctx := context.Background()
 
 	body := eventJSON(eventID, callID, accountID)
-	for i := 0; i < 3; i++ {
-		if resp := post(t, srv.URL+"/webhooks/calls", body); resp.StatusCode != http.StatusOK {
-			t.Fatalf("delivery %d: got %d, want 200", i, resp.StatusCode)
-		}
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			resp, err := http.Post(srv.URL+"/webhooks/calls", "application/json", strings.NewReader(body))
+			if err != nil {
+				t.Errorf("post: %v", err)
+				return
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("got %d, want 200", resp.StatusCode)
+			}
+		}()
 	}
+	wg.Wait()
 
 	var n int
 	row := st.Pool().QueryRow(ctx, `SELECT count(*) FROM events WHERE event_id = $1`, eventID)
